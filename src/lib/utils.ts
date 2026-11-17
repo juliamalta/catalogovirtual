@@ -1,0 +1,2 @@
+export function formatPrice(cents: number): string { return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100); }
+export function buildWhatsAppUrl(phone: string, message: string): string { const normalized = phone.replace(/\D/g, ""); if (!/^\d{12,13}$/.test(normalized)) throw new Error("Configure um WhatsApp válido com DDI e DDD."); return `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`; }
