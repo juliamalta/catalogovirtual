@@ -1,15 +1,28 @@
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, Minus, Plus, ShoppingBag, X } from "lucide-react";
 import { makeOrderUrl } from "@/features/cart/whatsapp";
 import { formatPrice } from "@/lib/utils";
 import type { CartDrawerProps, CartLineDisplayProps } from "./storefront-component.types";
+import { calculateCheckout, defaultDeliveryConfiguration } from "@/features/cart/checkout";
+import { CheckoutSummary } from "./checkout-summary";
 
 export function CartDrawer({ store, catalogTypography, cart, onClose }: CartDrawerProps) {
   const [openError, setOpenError] = useState(false);
+  const dialog = useRef<HTMLElement>(null);
+  const titleId = useId();
+  useEffect(() => {
+    const previousFocus = document.activeElement as HTMLElement | null;
+    dialog.current?.focus();
+    return () => previousFocus?.focus();
+  }, []);
+  const configuration = store.delivery ?? defaultDeliveryConfiguration;
+  const mode = cart.fulfillmentMode;
+  const summary = calculateCheckout(cart.lines, configuration, mode);
 
   function checkout() {
+    if (!summary.canCheckout) return;
     try {
-      window.open(makeOrderUrl(store, cart.lines), "_blank", "noopener,noreferrer");
+      window.open(makeOrderUrl(store, cart.lines, mode), "_blank", "noopener,noreferrer");
     } catch {
       setOpenError(true);
     }
@@ -22,13 +35,22 @@ export function CartDrawer({ store, catalogTypography, cart, onClose }: CartDraw
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <aside className="cart-drawer" aria-label="Seu pedido">
+      <aside className="cart-drawer" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={dialog} tabIndex={-1}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") { event.preventDefault(); onClose(); return; }
+          if (event.key !== "Tab") return;
+          const controls = dialog.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)');
+          if (!controls?.length) return;
+          const first = controls[0], last = controls[controls.length - 1];
+          if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog.current)) { event.preventDefault(); last.focus(); }
+          else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+        }}>
         <div className="drawer-head">
           <div>
             <span className={`drawer-kicker ${catalogTypography ? "!text-[10px]" : ""}`}>
               {store.name}
             </span>
-            <h2 className={catalogTypography ? "!text-[22px]" : ""}>
+            <h2 id={titleId} className={catalogTypography ? "!text-[22px]" : ""}>
               Seu pedido <span>({cart.count})</span>
             </h2>
           </div>
@@ -36,6 +58,7 @@ export function CartDrawer({ store, catalogTypography, cart, onClose }: CartDraw
             <X />
           </button>
         </div>
+        {cart.reconciliationNotice && <p className="cart-reconciliation-notice" role="status">{cart.reconciliationNotice}</p>}
         {cart.lines.length > 0 ? (
           <>
             <div className="drawer-lines">
@@ -49,17 +72,12 @@ export function CartDrawer({ store, catalogTypography, cart, onClose }: CartDraw
               ))}
             </div>
             <div className="drawer-footer">
-              <div className="subtotal-line">
-                <span className={catalogTypography ? "!text-xs" : ""}>Total dos produtos</span>
-                <b className={catalogTypography ? "!text-sm" : ""}>
-                  {formatPrice(cart.totalCents)}
-                </b>
-              </div>
-              <p>Entrega e disponibilidade combinadas diretamente com a loja.</p>
+              <CheckoutSummary configuration={configuration} summary={summary} mode={mode} onModeChange={(next) => { cart.setFulfillmentMode(next); setOpenError(false); }} />
               <button
                 className={`button checkout-button ${catalogTypography ? "!text-[13px]" : ""}`}
                 style={{ background: store.accent }}
                 onClick={checkout}
+                disabled={!summary.canCheckout}
               >
                 <span>Continuar pelo WhatsApp</span>
                 <ArrowRight size={17} />

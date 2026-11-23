@@ -10,5 +10,5 @@ const rolePermissions: Record<StoreMemberRole, ReadonlySet<StorePermission>> = {
 };
 
 export function hasStorePermission(membership: StoreMembershipRef | null, storeId: string, permission: StorePermission): boolean {
-  return membership?.storeId === storeId && rolePermissions[membership.role].has(permission);
+  return membership?.storeId === storeId && Object.prototype.hasOwnProperty.call(rolePermissions, membership.role) && rolePermissions[membership.role].has(permission);
 }

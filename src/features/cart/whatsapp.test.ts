@@ -12,7 +12,7 @@ describe("WhatsApp order", () => {
     const message = makeOrderMessage(store, lines);
     expect(message).toContain("2x Bolo de morango");
     expect(message).toContain("Obs.: Sem morango");
-    expect(message).toContain(`Total dos produtos: ${formatPrice(3600)}`);
+    expect(message).toContain(`Subtotal dos produtos: ${formatPrice(3600)}`);
   });
 
   it("encodes the message in a wa.me URL", () => {

@@ -59,9 +59,8 @@ export const storeSettingsSchema = z.object({
   secondaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   headline: z.string().trim().max(180),
   subtitle: z.string().trim().max(280),
-  deliveryEnabled: z.boolean(),
-  pickupEnabled: z.boolean(),
-  openingHours: z.record(z.string(), z.string().max(80)).default({})
+    deliveryEnabled: z.boolean(),
+    pickupEnabled: z.boolean()
 });
 
 export const imageUploadSchema = z.object({

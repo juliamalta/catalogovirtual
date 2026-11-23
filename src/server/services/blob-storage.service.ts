@@ -5,7 +5,9 @@ import { productImages, products, storeMembers, stores } from "@/lib/db/schema";
 import { getCurrentSession } from "@/lib/auth/session";
 import { hasStorePermission } from "@/features/stores/permissions";
 import { MAX_PRODUCT_IMAGE_SIZE, MAX_PRODUCT_IMAGES } from "@/features/images/image-storage.types";
+import { getBlobUploadMode, hasBlobWriteCredentials } from "./blob-configuration";
 import { matchesImageSignature, productImageCompletionPayloadSchema, productImageIdSchema, productImageUploadPayloadSchema } from "@/features/images/validations";
+import { lockStorePermission } from "@/server/authorization";
 
 const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"] as const;
 const extensionByMime = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" } as const;
@@ -18,13 +20,23 @@ export class ProductImageStorageError extends Error {
 
 type ProductContext = { userId: string; storeId: string; storeSlug: string; productId: string; productName: string };
 type CompletionPayload = { userId: string; storeId: string; storeSlug: string; productId: string; mimeType: (typeof allowedMimeTypes)[number]; size: number; replaceImageId?: string };
+type StoreTransaction = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
 
-export function isBlobStorageConfigured() {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+async function lockProductForMutation(tx: StoreTransaction, context: ProductContext) {
+  await lockStorePermission(tx, context.storeId, context.userId, "MANAGE_PRODUCTS");
+  const [product] = await tx.select({ id: products.id }).from(products)
+    .where(and(eq(products.id, context.productId), eq(products.storeId, context.storeId))).for("update");
+  if (!product) throw new ProductImageStorageError("O produto não pertence a esta loja.", 404);
 }
 
+export function isBlobStorageConfigured() {
+  return getBlobUploadMode() !== null;
+}
+
+export const getProductImageUploadMode = getBlobUploadMode;
+
 export function assertBlobStorageConfigured() {
-  if (!isBlobStorageConfigured()) {
+  if (!hasBlobWriteCredentials()) {
     throw new ProductImageStorageError("O Vercel Blob ainda não está configurado neste ambiente.", 503);
   }
 }
@@ -130,14 +142,10 @@ export async function persistCompletedProductImage(blob: PutBlobResult, rawPaylo
   const data: CompletionPayload = parsed.data;
   const context = await authorizeProduct(data.storeSlug, data.productId, data.userId);
   if (context.storeId !== data.storeId) throw new ProductImageStorageError("A loja do upload não corresponde ao produto.", 403);
-  await assertBlobContents(blob, context, data.mimeType, data.size);
-
   const db = getDb();
   const previousUrl = await db.transaction(async (tx) => {
-    const [lockedProduct] = await tx.select({ id: products.id }).from(products)
-      .where(and(eq(products.id, context.productId), eq(products.storeId, context.storeId)))
-      .for("update");
-    if (!lockedProduct) throw new ProductImageStorageError("O produto não pertence a esta loja.", 404);
+    await lockProductForMutation(tx, context);
+    await assertBlobContents(blob, context, data.mimeType, data.size);
     const images = await tx.select().from(productImages)
       .where(eq(productImages.productId, context.productId))
       .orderBy(asc(productImages.sortOrder));
@@ -180,19 +188,20 @@ export async function removeProductImageForUser(storeSlug: string, productId: st
   const parsedId = productImageIdSchema.safeParse(imageId);
   if (!parsedId.success) throw new ProductImageStorageError("A imagem selecionada é inválida.");
   const db = getDb();
-  const [image] = await db.select().from(productImages)
-    .where(and(eq(productImages.id, parsedId.data), eq(productImages.productId, context.productId)))
-    .limit(1);
-  if (!image) throw new ProductImageStorageError("A imagem não pertence a este produto.", 404);
-
-  const isOwnedBlob = isOwnedProductBlobUrl(image.imageUrl, context.storeId, context.productId);
-  if (isOwnedBlob) assertBlobStorageConfigured();
-  await db.delete(productImages).where(and(eq(productImages.id, image.id), eq(productImages.productId, context.productId)));
-  const remaining = await db.select({ id: productImages.id }).from(productImages)
-    .where(eq(productImages.productId, context.productId)).orderBy(asc(productImages.sortOrder));
-  await Promise.all(remaining.map((item, index) => db.update(productImages).set({ sortOrder: index })
-    .where(and(eq(productImages.id, item.id), eq(productImages.productId, context.productId)))));
-  if (isOwnedBlob) {
+  const image = await db.transaction(async (tx) => {
+    await lockProductForMutation(tx, context);
+    const [image] = await tx.select().from(productImages)
+      .where(and(eq(productImages.id, parsedId.data), eq(productImages.productId, context.productId))).limit(1);
+    if (!image) throw new ProductImageStorageError("A imagem não pertence a este produto.", 404);
+    if (isOwnedProductBlobUrl(image.imageUrl, context.storeId, context.productId)) assertBlobStorageConfigured();
+    await tx.delete(productImages).where(and(eq(productImages.id, image.id), eq(productImages.productId, context.productId)));
+    const remaining = await tx.select({ id: productImages.id }).from(productImages)
+      .where(eq(productImages.productId, context.productId)).orderBy(asc(productImages.sortOrder));
+    await Promise.all(remaining.map((item, index) => tx.update(productImages).set({ sortOrder: index })
+      .where(and(eq(productImages.id, item.id), eq(productImages.productId, context.productId)))));
+    return image;
+  });
+  if (isOwnedProductBlobUrl(image.imageUrl, context.storeId, context.productId)) {
     await del(image.imageUrl).catch(() => undefined);
   }
 }
@@ -200,11 +209,14 @@ export async function removeProductImageForUser(storeSlug: string, productId: st
 export async function makeProductImagePrimaryForUser(storeSlug: string, productId: string, imageId: string) {
   const context = await authorizeProduct(storeSlug, productId);
   const db = getDb();
-  const images = await db.select().from(productImages).where(eq(productImages.productId, context.productId)).orderBy(asc(productImages.sortOrder));
-  if (!images.some((image) => image.id === imageId)) throw new ProductImageStorageError("A imagem não pertence a este produto.", 404);
-  const reordered = [images.find((image) => image.id === imageId)!, ...images.filter((image) => image.id !== imageId)];
-  await Promise.all(reordered.map((image, index) => db.update(productImages).set({ sortOrder: index })
-    .where(and(eq(productImages.id, image.id), eq(productImages.productId, context.productId)))));
+  await db.transaction(async (tx) => {
+    await lockProductForMutation(tx, context);
+    const images = await tx.select().from(productImages).where(eq(productImages.productId, context.productId)).orderBy(asc(productImages.sortOrder));
+    if (!images.some((image) => image.id === imageId)) throw new ProductImageStorageError("A imagem não pertence a este produto.", 404);
+    const reordered = [images.find((image) => image.id === imageId)!, ...images.filter((image) => image.id !== imageId)];
+    await Promise.all(reordered.map((image, index) => tx.update(productImages).set({ sortOrder: index })
+      .where(and(eq(productImages.id, image.id), eq(productImages.productId, context.productId)))));
+  });
 }
 
 export async function reorderProductImagesForUser(storeSlug: string, productId: string, imageIds: string[]) {
@@ -213,29 +225,33 @@ export async function reorderProductImagesForUser(storeSlug: string, productId: 
     throw new ProductImageStorageError("A ordem das imagens é inválida.");
   }
   const db = getDb();
-  const images = await db.select({ id: productImages.id }).from(productImages)
-    .where(eq(productImages.productId, context.productId));
-  if (images.length !== imageIds.length || images.some((image) => !imageIds.includes(image.id))) {
-    throw new ProductImageStorageError("A lista de imagens mudou. Atualize a página e tente novamente.", 409);
-  }
-  await Promise.all(imageIds.map((id, index) => db.update(productImages).set({ sortOrder: index })
-    .where(and(eq(productImages.id, id), eq(productImages.productId, context.productId)))));
+  await db.transaction(async (tx) => {
+    await lockProductForMutation(tx, context);
+    const images = await tx.select({ id: productImages.id }).from(productImages).where(eq(productImages.productId, context.productId));
+    if (images.length !== imageIds.length || images.some((image) => !imageIds.includes(image.id))) {
+      throw new ProductImageStorageError("A lista de imagens mudou. Atualize a página e tente novamente.", 409);
+    }
+    await Promise.all(imageIds.map((id, index) => tx.update(productImages).set({ sortOrder: index })
+      .where(and(eq(productImages.id, id), eq(productImages.productId, context.productId)))));
+  });
 }
 
 export async function cleanupUnattachedProductBlob(storeSlug: string, productId: string, url: string) {
   const context = await authorizeProduct(storeSlug, productId);
   if (!isOwnedProductBlobUrl(url, context.storeId, context.productId)) throw new ProductImageStorageError("O arquivo não pertence a este produto.", 403);
-  const [attached] = await getDb().select({ id: productImages.id }).from(productImages)
-    .where(and(eq(productImages.productId, context.productId), eq(productImages.imageUrl, url)))
-    .limit(1);
-  if (attached) return false;
-  assertBlobStorageConfigured();
-  await del(url).catch(() => undefined);
-  return true;
+  return getDb().transaction(async (tx) => {
+    await lockProductForMutation(tx, context);
+    const [attached] = await tx.select({ id: productImages.id }).from(productImages)
+      .where(and(eq(productImages.productId, context.productId), eq(productImages.imageUrl, url))).limit(1);
+    if (attached) return false;
+    assertBlobStorageConfigured();
+    await del(url);
+    return true;
+  });
 }
 
 export async function deleteProductBlobsAfterProductRemoval(storeId: string, productId: string, imageUrls: string[]) {
   const urls = imageUrls.filter((url) => isOwnedProductBlobUrl(url, storeId, productId));
-  if (!urls.length || !isBlobStorageConfigured()) return;
+  if (!urls.length || !hasBlobWriteCredentials()) return;
   await del(urls).catch(() => undefined);
 }

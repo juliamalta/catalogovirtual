@@ -1,11 +1,17 @@
-import { Plus } from "lucide-react";
+import React from "react";
+import { Minus, Plus } from "lucide-react";
+import { requiresProductSelection } from "@/features/cart/product-selection";
 import { formatPrice } from "@/lib/utils";
 import type { ProductCardProps } from "./storefront-component.types";
 
-export function ProductCard({ catalogTypography, product, accent, onAdd, onSelect }: ProductCardProps) {
+export function ProductCard({ cart, catalogTypography, product, accent, onAdd, onSelect }: ProductCardProps) {
+  const configurable = requiresProductSelection(product);
+  const lines = cart.lines.filter((line) => line.product.id === product.id);
+  const quantity = lines.reduce((sum, line) => sum + line.quantity, 0);
+  const lastLine = lines[lines.length - 1];
   return (
     <article className="product-card">
-      <button
+      {product.image && <button
         className="product-image-button"
         onClick={() => onSelect(product)}
         aria-label={`Ver ${product.name}`}
@@ -18,7 +24,7 @@ export function ProductCard({ catalogTypography, product, accent, onAdd, onSelec
           )}
           {product.unavailable && <span className="unavailable">Indisponível</span>}
         </div>
-      </button>
+      </button>}
       <div className="product-info">
         <button
           className={`product-title ${catalogTypography ? "!text-xs md:!text-[13px]" : ""}`}
@@ -26,22 +32,30 @@ export function ProductCard({ catalogTypography, product, accent, onAdd, onSelec
         >
           {product.name}
         </button>
-        <p className={catalogTypography ? "!h-[30px] !text-[10px] !leading-[1.4] md:!h-[35px] md:!text-xs md:!leading-[1.45]" : ""}>
+        {product.description && <p className={catalogTypography ? "!text-[10px] !leading-[1.4] md:!text-xs md:!leading-[1.45]" : ""}>
           {product.description}
-        </p>
+        </p>}
         <div className="product-bottom">
           <strong className={catalogTypography ? "!text-[11px] md:!text-[13px]" : ""}>
             {formatPrice(product.priceCents)}
           </strong>
-          <button
-            className="add-product"
-            style={{ "--store-accent": accent } as React.CSSProperties}
-            onClick={() => (product.options ? onSelect(product) : onAdd(product))}
-            disabled={product.unavailable}
-            aria-label={`Adicionar ${product.name}`}
-          >
-            <Plus size={17} />
-          </button>
+          <div className="product-card-controls" role="group" aria-label={`Quantidade de ${product.name}`}>
+            {!configurable && quantity > 0 && <>
+              <button type="button" className="add-product" aria-label={`Diminuir quantidade de ${product.name}`}
+                onClick={() => cart.setQuantity(lastLine.key, lastLine.quantity - 1)}><Minus size={17} /></button>
+              <span className="product-card-quantity" aria-label={`${quantity} no pedido`}>{quantity}</span>
+            </>}
+            <button
+              type="button"
+              className={configurable ? "choose-product-options" : "add-product"}
+              style={{ "--store-accent": accent } as React.CSSProperties}
+              onClick={() => (configurable ? onSelect(product) : onAdd(product))}
+              disabled={product.unavailable}
+              aria-label={configurable ? `Escolher opções de ${product.name}` : `Adicionar ${product.name}`}
+            >
+              {configurable ? "Escolher opções" : <Plus size={17} />}
+            </button>
+          </div>
         </div>
       </div>
     </article>

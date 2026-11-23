@@ -2,12 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createCategoryForStore, createProductForStore, createStoreForUser, deleteCategoryForStore, deleteProductForStore, isStoreSlugAvailableForUser, setProductActiveForStore, setStorePublication, updateCategoryForStore, updateProductForStore, updateStoreForUser, StoreInputError } from "@/server/services/store.service";
+import { createCategoryForStore, createProductForStore, createStoreForUser, deleteCategoryForStore, deleteProductForStore, isStoreSlugAvailableForUser, setProductActiveForStore, setStorePublication, updateCategoryForStore, updateProductForStore, updateStoreBusinessHours, updateStoreForUser, StoreInputError } from "@/server/services/store.service";
 import { cleanupUnattachedProductBlob, getProductImagesForUser, makeProductImagePrimaryForUser, ProductImageStorageError, removeProductImageForUser, reorderProductImagesForUser } from "@/server/services/blob-storage.service";
 import { cleanupUnattachedStoreAppearanceImage, StoreAppearanceImageError } from "@/server/services/store-image-storage.service";
+import type { ProductConfigurationDTO } from "@/types/product-configuration.types";
 
 export interface ActionState { error?: string }
-export interface ProductMutationResult { success: boolean; productId?: string; error?: string }
+export interface ProductMutationResult { success: boolean; productId?: string; configuration?: ProductConfigurationDTO; error?: string }
 const textField = (formData: FormData, key: string) => { const value = formData.get(key); return typeof value === "string" ? value : ""; };
 const idPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function friendlyError(error: unknown) {
@@ -43,7 +44,7 @@ export async function createProductAction(storeSlug: string, formData: FormData)
     const product = await createProductForStore(storeSlug, formData);
     revalidatePath(`/painel/${storeSlug}`);
     revalidatePath(`/painel/${storeSlug}/produtos`);
-    return { success: true, productId: product.id };
+    return { success: true, productId: product.id, configuration: product.productConfiguration };
   } catch (error) {
     return { success: false, error: friendlyError(error) };
   }
@@ -154,7 +155,20 @@ export async function updateStoreAction(storeSlug: string, formData: FormData) {
   try { await updateStoreForUser(storeSlug, formData); }
   catch (error) { redirect(`/painel/${storeSlug}/configuracoes?erro=${encodeURIComponent(friendlyError(error))}`); }
   revalidatePath(`/painel/${storeSlug}`); revalidatePath(`/painel/${storeSlug}/configuracoes`);
+  revalidatePath(`/${storeSlug}`); revalidatePath(`/${storeSlug}/preview`);
   redirect(`/painel/${storeSlug}/configuracoes?status=salvo`);
+}
+
+export async function saveStoreHoursAction(storeSlug: string, configuration: unknown) {
+  try {
+    const status = await updateStoreBusinessHours(storeSlug, configuration);
+    revalidatePath(`/painel/${storeSlug}/configuracoes`);
+    revalidatePath(`/${storeSlug}`);
+    revalidatePath(`/${storeSlug}/preview`);
+    return { success: true as const, status };
+  } catch (error) {
+    return { success: false as const, error: friendlyError(error) };
+  }
 }
 
 export async function saveStoreAppearanceAction(storeSlug: string, formData: FormData): Promise<{ success: boolean; error?: string }> {

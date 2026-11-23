@@ -74,10 +74,10 @@ export function AppearanceImageField({ assetType, value, file, progress, blobCon
           </label>
           {(file || value) && <button type="button" disabled={disabled} onClick={() => { onFileChange(undefined); onUrlChange(""); setError(undefined); }} aria-label={`Remover ${label.title.toLocaleLowerCase("pt-BR")}`}><Trash2 size={15} /></button>}
         </div>
-        <label className="appearance-image-url">URL HTTPS<input type="url" value={value} disabled={disabled} placeholder="https://..." onChange={(event) => { onFileChange(undefined); onUrlChange(event.currentTarget.value); }} /></label>
+        <label className="appearance-image-url">Link da imagem<input type="url" value={value} disabled={disabled} placeholder="https://..." onChange={(event) => { onFileChange(undefined); onUrlChange(event.currentTarget.value); }} /></label>
         {file && <small className="appearance-image-help">O arquivo será enviado ao salvar as alterações.</small>}
         {progress !== undefined && <div className="appearance-image-progress" role="status"><span>Enviando imagem… {progress}%</span><span><i style={{ width: `${progress}%` }} /></span></div>}
-        {!blobConfigured && <small className="appearance-image-help">Upload pelo Vercel Blob indisponível até conectar o armazenamento. Você ainda pode informar uma URL HTTPS.</small>}
+        {!blobConfigured && <small className="appearance-image-help">O envio de arquivos não está disponível agora. Você pode usar um link de imagem que comece com https://.</small>}
         {error && <small role="alert" className="appearance-image-error">{error}</small>}
       </div>
     </div>

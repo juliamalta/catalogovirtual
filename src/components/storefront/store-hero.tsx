@@ -1,9 +1,11 @@
-import { ArrowRight, Clock3 } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { StorefrontStoreProps } from "./storefront-component.types";
+import { resolveStorefrontCopy } from "./storefront-copy";
 
-export function StoreHero({ store, isPreview = false }: StorefrontStoreProps) {
+export function StoreHero({ store, isPreview = false, isDemo = false }: StorefrontStoreProps) {
   const showcase = store.type === "SHOWCASE";
   const catalog = store.type === "CATALOG";
+  const copy = resolveStorefrontCopy(store, isDemo);
   const catalogTypography = catalog
     ? "!text-[30px] sm:!text-[34px] md:!text-[38px] lg:!text-[42px]"
     : "";
@@ -20,27 +22,26 @@ export function StoreHero({ store, isPreview = false }: StorefrontStoreProps) {
     >
       {showcase ? (
         <div className="store-hero-copy showcase-copy">
-          <span className="showcase-eyebrow">{isPreview ? "SUA LOJA" : "OBJETOS PARA VIVER BEM"}</span>
-          <h1>{store.tagline}</h1>
-          <p>{store.subtitle || store.description}</p>
+          {copy.heroEyebrow && <span className="showcase-eyebrow">{isPreview ? "SUA LOJA" : copy.heroEyebrow}</span>}
+          <h1>{copy.heroTitle}</h1>
+          {copy.heroSubtitle && <p>{copy.heroSubtitle}</p>}
           <a className="button showcase-button" href="#produtos">
-            Descobrir coleção <ArrowRight size={16} />
+            {copy.heroAction} <ArrowRight size={16} />
           </a>
         </div>
       ) : (
         <div className="store-hero-copy">
-          {!isPreview && <span className={`store-open ${catalog ? "!text-[12px] sm:!text-[13px] md:!text-sm" : ""}`}>
-            <i /> Loja aberta hoje <span>·</span> <Clock3 size={13} /> 9h–18h
+          {!isPreview && copy.heroStatus && <span className={`store-open ${catalog ? "!text-[12px] sm:!text-[13px] md:!text-sm" : ""}`}>
+            <i /> {copy.heroStatus}
           </span>}
-          <h1 className={catalogTypography}>{store.tagline}</h1>
-          <p className={catalog ? "!text-xs sm:!text-[13px] md:!text-sm" : undefined}>
-            {store.subtitle || store.description}
-          </p>
+          {!isDemo && copy.heroEyebrow && <span className="store-open store-hero-type">{copy.heroEyebrow}</span>}
+          <h1 className={catalogTypography}>{copy.heroTitle}</h1>
+          {copy.heroSubtitle && <p className={catalog ? "!text-xs sm:!text-[13px] md:!text-sm" : undefined}>{copy.heroSubtitle}</p>}
           <a
             className={`store-hero-cta ${catalog ? "!text-xs sm:!text-[13px] md:!text-sm" : ""}`}
             href="#produtos"
           >
-            Conheça nossos produtos <ArrowRight size={15} />
+            {copy.heroAction} <ArrowRight size={15} />
           </a>
         </div>
       )}

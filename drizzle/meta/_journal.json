@@ -8,6 +8,27 @@
       "when": 1794787200000,
       "tag": "0000_initial_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794937511365,
+      "tag": "0001_restaurant_product_configuration",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794938034508,
+      "tag": "0002_whatsapp_order_forwarding",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795027199826,
+      "tag": "0003_store_delivery_settings",
+      "breakpoints": true
     }
   ]
 }

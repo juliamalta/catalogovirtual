@@ -14,13 +14,14 @@ interface ProductImageUploadProps {
   productId?: string;
   blobConfigured: boolean;
   disabled: boolean;
+  showHeading?: boolean;
 }
 
 function revokeLocalPreview(image: ProductImageSlot) {
   if (image.file && image.imageUrl.startsWith("blob:")) URL.revokeObjectURL(image.imageUrl);
 }
 
-export function ProductImageUpload({ images, onImagesChange, storeSlug, productId, blobConfigured, disabled }: ProductImageUploadProps) {
+export function ProductImageUpload({ images, onImagesChange, storeSlug, productId, blobConfigured, disabled, showHeading = true }: ProductImageUploadProps) {
   const addInputRef = useRef<HTMLInputElement>(null);
   const replaceInputRefs = useRef(new Map<string, HTMLInputElement>());
   const latestImages = useRef(images);
@@ -157,26 +158,26 @@ export function ProductImageUpload({ images, onImagesChange, storeSlug, productI
   }
 
   return (
-    <section aria-labelledby="product-images-title" className="space-y-3">
+    <section aria-label={showHeading ? undefined : "Upload de imagens"} aria-labelledby={showHeading ? "product-images-title" : undefined} className="space-y-3">
       <div>
-        <h2 id="product-images-title" className="text-sm font-semibold text-[#403a47]">Imagens do produto</h2>
-        <p className="mt-1 text-xs leading-5 text-[#898390]">Adicione até cinco fotos. A primeira é usada como foto principal.</p>
+        {showHeading && <h2 id="product-images-title" className="text-sm font-semibold text-ink">Imagens do produto</h2>}
+        <p className="mt-1 text-xs leading-5 text-ink-secondary">Adicione até cinco fotos. A primeira é usada como foto principal.</p>
       </div>
 
-      {!blobConfigured && <p role="status" className="rounded-lg border border-[#eadfbd] bg-[#fffaf0] px-3 py-2.5 text-xs leading-5 text-[#80672f]">O Vercel Blob ainda não está configurado. O envio ficará disponível quando o armazenamento for conectado.</p>}
-      {message && <p role="alert" className="rounded-lg border border-[#f1d5d8] bg-[#fff5f5] px-3 py-2.5 text-xs leading-5 text-[#a23f4c]">{message}</p>}
+      {!blobConfigured && <p role="status" className="rounded-lg border border-warning-border bg-warning-soft px-3 py-2.5 text-xs leading-5 text-warning">O Vercel Blob ainda não está configurado. O envio ficará disponível quando o armazenamento for conectado.</p>}
+      {message && <p role="alert" className="rounded-lg border border-error-border bg-error-soft px-3 py-2.5 text-xs leading-5 text-error">{message}</p>}
 
-      <div onDragEnter={(event) => { event.preventDefault(); if (!disabled && blobConfigured) setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={(event) => { if (event.currentTarget === event.target) setDragging(false); }} onDrop={onDrop} className={`rounded-xl border border-dashed p-4 text-center transition ${dragging ? "border-[#7351d6] bg-[#f8f5ff]" : "border-[#dcd6e2] bg-[#fcfbfd]"}`}>
-        <input ref={addInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" className="sr-only" onChange={onFileInput} disabled={disabled || !blobConfigured || images.length >= MAX_PRODUCT_IMAGES} />
-        <button type="button" disabled={disabled || !blobConfigured || images.length >= MAX_PRODUCT_IMAGES} onClick={() => addInputRef.current?.click()} className="mx-auto inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-[#7351d6] transition hover:bg-[#f2edfb] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#7351d6]/15 disabled:cursor-not-allowed disabled:text-[#aaa5b0]">
+      <div onDragEnter={(event) => { event.preventDefault(); if (!disabled && blobConfigured) setDragging(true); }} onDragOver={(event) => event.preventDefault()} onDragLeave={(event) => { if (event.currentTarget === event.target) setDragging(false); }} onDrop={onDrop} className={`rounded-xl border border-dashed p-4 text-center transition ${dragging ? "border-brand bg-brand-soft" : "border-line bg-canvas"}`}>
+        <input aria-label="Adicionar imagens do produto" ref={addInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" className="sr-only" onChange={onFileInput} disabled={disabled || !blobConfigured || images.length >= MAX_PRODUCT_IMAGES} />
+        <button type="button" disabled={disabled || !blobConfigured || images.length >= MAX_PRODUCT_IMAGES} onClick={() => addInputRef.current?.click()} className="mx-auto inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-brand transition hover:bg-brand-soft focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15 disabled:cursor-not-allowed disabled:text-ink-secondary">
           <ImagePlus size={17} /> Escolher imagens
         </button>
-        <p className="mt-1 text-xs text-[#96909c]">ou arraste os arquivos para cá · JPG, PNG ou WebP · até 5 MB cada</p>
-        {images.length > 0 && <p className="mt-2 text-[11px] font-medium text-[#817b88]">{images.length} de {MAX_PRODUCT_IMAGES} imagens</p>}
+        <p className="mt-1 text-xs text-ink-secondary">ou arraste os arquivos para cá · JPG, PNG ou WebP · até 5 MB cada</p>
+        {images.length > 0 && <p className="mt-2 text-[11px] font-medium text-ink-secondary">{images.length} de {MAX_PRODUCT_IMAGES} imagens</p>}
       </div>
 
       <div className="hidden">
-        {images.map((image) => <input key={image.key} ref={(element) => { if (element) replaceInputRefs.current.set(image.key, element); else replaceInputRefs.current.delete(image.key); }} type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={(event) => onReplaceInput(image.key, event)} disabled={disabled || !blobConfigured} />)}
+        {images.map((image) => <input aria-label="Substituir imagem do produto" key={image.key} ref={(element) => { if (element) replaceInputRefs.current.set(image.key, element); else replaceInputRefs.current.delete(image.key); }} type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" onChange={(event) => onReplaceInput(image.key, event)} disabled={disabled || !blobConfigured} />)}
       </div>
 
       <ProductImageGallery

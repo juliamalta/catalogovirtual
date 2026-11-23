@@ -3,18 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ExternalLink, LayoutDashboard, Menu, Palette, Settings, Tags, X, Package } from "lucide-react";
+import { ArrowUpRight, ExternalLink, LayoutDashboard, Menu, X } from "lucide-react";
 import { Brand } from "@/components/brand";
+import { getDashboardDestinations } from "@/components/dashboard/dashboard-destinations";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
+import type { StoreMembershipRef } from "@/features/stores/permissions";
 
 interface DashboardSidebarProps {
   storeName: string;
   profileName: string;
   storeSlug: string;
   isPublished: boolean;
+  membership: StoreMembershipRef;
 }
 
-export function DashboardSidebar({ storeName, profileName, storeSlug, isPublished }: DashboardSidebarProps) {
+export function DashboardSidebar({ storeName, profileName, storeSlug, isPublished, membership }: DashboardSidebarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [mobileViewport, setMobileViewport] = useState(false);
@@ -23,10 +26,7 @@ export function DashboardSidebar({ storeName, profileName, storeSlug, isPublishe
   const base = `/painel/${storeSlug}`;
   const items = [
     { href: base, label: "Visão geral", icon: LayoutDashboard },
-    { href: `${base}/produtos`, label: "Produtos", icon: Package },
-    { href: `${base}/categorias`, label: "Categorias", icon: Tags },
-    { href: `${base}/aparencia`, label: "Aparência", icon: Palette },
-    { href: `${base}/configuracoes`, label: "Configurações", icon: Settings }
+    ...getDashboardDestinations(storeSlug, membership)
   ];
 
   useEffect(() => setOpen(false), [pathname]);
@@ -45,7 +45,11 @@ export function DashboardSidebar({ storeName, profileName, storeSlug, isPublishe
   useEffect(() => {
     if (!open) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const frame = window.requestAnimationFrame(() => asideRef.current?.querySelector<HTMLElement>("a")?.focus());
+    const frame = window.requestAnimationFrame(() => {
+      const activeLink = asideRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
+      const firstLink = asideRef.current?.querySelector<HTMLElement>('a[href]');
+      (activeLink ?? firstLink)?.focus();
+    });
     const handleMenuKeys = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setOpen(false);
@@ -53,7 +57,7 @@ export function DashboardSidebar({ storeName, profileName, storeSlug, isPublishe
         return;
       }
       if (event.key === "Tab") {
-        const focusable = asideRef.current?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled)');
+        const focusable = Array.from(asideRef.current?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled)') ?? []).filter((element) => element.getClientRects().length > 0);
         if (!focusable?.length) return;
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
@@ -82,34 +86,35 @@ export function DashboardSidebar({ storeName, profileName, storeSlug, isPublishe
       <div className="dashboard-mobile-topbar">
         <Brand />
         <button ref={toggleRef} className="dashboard-mobile-toggle" type="button" aria-label={open ? "Fechar menu" : "Abrir menu"} aria-expanded={open} aria-controls="dashboard-navigation" onClick={() => setOpen((value) => !value)}>
-          {open ? <X size={20} /> : <Menu size={20} />}
+          {open ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
         </button>
       </div>
-      <aside ref={asideRef} className={`dashboard-sidebar${open ? " is-open" : ""}`} role={open && mobileViewport ? "dialog" : undefined} aria-modal={open && mobileViewport || undefined} aria-hidden={mobileViewport && !open} inert={mobileViewport && !open} aria-label={open ? "Menu do painel" : undefined}>
-        <div className="dashboard-sidebar-brand"><Brand /></div>
+      <aside id="dashboard-navigation" ref={asideRef} className={`dashboard-sidebar${open ? " is-open" : ""}`} role={open && mobileViewport ? "dialog" : undefined} aria-modal={open && mobileViewport || undefined} aria-hidden={mobileViewport && !open} inert={mobileViewport && !open} aria-label={open ? "Menu do painel" : undefined}>
+        <div className="dashboard-sidebar-brand">
+          <Brand />
+          <button type="button" className="dashboard-mobile-toggle dashboard-drawer-close" aria-label="Fechar menu" onClick={() => setOpen(false)}><X size={18} aria-hidden="true" /></button>
+        </div>
         <div className="dashboard-store-context">
           <span className="dashboard-store-avatar" aria-hidden="true">{storeName.trim().charAt(0).toUpperCase()}</span>
-          <span className="dashboard-store-meta"><small>Loja ativa</small><strong title={storeName}>{storeName}</strong></span>
-          <span className={`dashboard-status-dot${isPublished ? " is-published" : ""}`} title={isPublished ? "Publicada" : "Rascunho"} />
+          <span className="dashboard-store-meta"><strong title={storeName}>{storeName}</strong><small><span className={`dashboard-status-dot${isPublished ? " is-published" : ""}`} aria-hidden="true" />{isPublished ? "Publicada" : "Rascunho"}</small></span>
         </div>
-        <nav id="dashboard-navigation" className="dashboard-nav" aria-label="Navegação do painel">
-          <span className="dashboard-nav-label">GERENCIAR LOJA</span>
+        <nav className="dashboard-nav" aria-label="Navegação do painel">
           {items.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || (href !== base && pathname.startsWith(`${href}/`));
             return <Link className={`dashboard-nav-link${active ? " is-active" : ""}`} href={href} key={href} aria-current={active ? "page" : undefined}>
-              <Icon size={18} strokeWidth={1.8} /><span>{label}</span>
+              <Icon size={18} strokeWidth={1.8} aria-hidden="true" /><span>{label}</span>
             </Link>;
           })}
-          <Link className="dashboard-nav-link dashboard-view-store" href={isPublished ? `/${storeSlug}` : `/${storeSlug}/preview`} target="_blank" rel="noreferrer">
-            <ExternalLink size={18} strokeWidth={1.8} /><span>Visualizar loja</span>
+          <Link className="dashboard-nav-link dashboard-view-store" href={`/${storeSlug}/preview`} target="_blank" rel="noreferrer">
+            <ExternalLink size={18} strokeWidth={1.8} aria-hidden="true" /><span>Prévia da loja</span><ArrowUpRight className="dashboard-view-arrow" size={14} aria-hidden="true" />
           </Link>
         </nav>
         <div className="dashboard-sidebar-footer">
-          <div className="dashboard-profile"><span className="dashboard-profile-avatar" aria-hidden="true">{profileName.trim().charAt(0).toUpperCase()}</span><span><strong>{profileName}</strong><small>Conta administradora</small></span></div>
+          <div className="dashboard-profile"><span className="dashboard-profile-avatar" aria-hidden="true">{profileName.trim().charAt(0).toUpperCase()}</span><strong title={profileName}>{profileName}</strong></div>
           <SignOutButton />
         </div>
       </aside>
-      {open && <button className="dashboard-sidebar-backdrop" type="button" aria-label="Fechar menu" onClick={() => setOpen(false)} />}
+      {open && <button className="dashboard-sidebar-backdrop" type="button" tabIndex={-1} aria-hidden="true" onClick={() => setOpen(false)} />}
     </>
   );
 }

@@ -11,8 +11,8 @@ export function StoreModelStep({ storefrontType, primaryColor, onSelect }: Store
   return (
     <section aria-labelledby="model-title" className="space-y-6">
       <div>
-        <h2 id="model-title" tabIndex={-1} className="text-2xl font-semibold tracking-tight text-[#292431] outline-none sm:text-[28px]">Como você quer apresentar seus produtos?</h2>
-        <p className="mt-2 text-sm leading-6 text-[#77717f]">Escolha o formato que melhor combina com a forma como você vende.</p>
+        <h2 id="model-title" tabIndex={-1} className="text-2xl font-semibold tracking-tight text-ink outline-none sm:text-[28px]">Como você quer apresentar seus produtos?</h2>
+        <p className="mt-2 text-sm leading-6 text-ink-secondary">Escolha o formato que melhor combina com a forma como você vende.</p>
       </div>
       <div role="radiogroup" aria-labelledby="model-title" className="grid gap-3 md:grid-cols-3">
         <StoreModelCard name="storefrontType" value="MENU" selected={storefrontType === "MENU"} primaryColor={primaryColor} onSelect={onSelect} />

@@ -7,6 +7,8 @@ import { getCurrentSession } from "@/lib/auth/session";
 import { hasStorePermission } from "@/features/stores/permissions";
 import { MAX_PRODUCT_IMAGE_SIZE, PRODUCT_IMAGE_MIME_TYPES } from "@/features/images/image-storage.types";
 import { matchesImageSignature } from "@/features/images/validations";
+import { hasBlobWriteCredentials } from "./blob-configuration";
+import { lockStorePermission } from "@/server/authorization";
 
 const assetTypes = ["logo", "cover"] as const;
 const extensionByMime = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" } as const;
@@ -93,22 +95,32 @@ export async function deleteReplacedStoreAppearanceImages(storeId: string, previ
     previous.logoUrl && previous.logoUrl !== next.logoUrl && isOwnedStoreAppearanceBlobUrl(previous.logoUrl, storeId, "logo") ? previous.logoUrl : null,
     previous.coverUrl && previous.coverUrl !== next.coverUrl && isOwnedStoreAppearanceBlobUrl(previous.coverUrl, storeId, "cover") ? previous.coverUrl : null
   ].filter((url): url is string => Boolean(url));
-  if (oldUrls.length) await del(oldUrls).catch(() => undefined);
+  if (!oldUrls.length) return;
+  await getDb().transaction(async (tx) => {
+    const [current] = await tx.select({ logoUrl: stores.logoUrl, coverUrl: stores.coverUrl }).from(stores)
+      .where(eq(stores.id, storeId)).for("update").limit(1);
+    const unattached = oldUrls.filter((url) => url !== current?.logoUrl && url !== current?.coverUrl);
+    if (unattached.length) await del(unattached).catch(() => undefined);
+  });
 }
 
 export async function cleanupUnattachedStoreAppearanceImage(storeSlug: string, url: string, assetType: (typeof assetTypes)[number]) {
   if (!assetTypes.includes(assetType)) throw new StoreAppearanceImageError("O tipo de imagem não é permitido.");
   const context = await authorizeStoreAppearance(storeSlug);
   if (!isOwnedStoreAppearanceBlobUrl(url, context.storeId, assetType)) throw new StoreAppearanceImageError("O arquivo não pertence a esta loja.", 403);
-  const [store] = await getDb().select({ logoUrl: stores.logoUrl, coverUrl: stores.coverUrl }).from(stores)
-    .where(eq(stores.id, context.storeId)).limit(1);
-  if (store?.logoUrl === url || store?.coverUrl === url) return false;
-  assertStoreAppearanceBlobConfigured();
-  await del(url).catch(() => undefined);
-  return true;
+  return getDb().transaction(async (tx) => {
+    await lockStorePermission(tx, context.storeId, context.userId, "MANAGE_SETTINGS");
+    const [store] = await tx.select({ logoUrl: stores.logoUrl, coverUrl: stores.coverUrl }).from(stores)
+      .where(eq(stores.id, context.storeId)).for("update").limit(1);
+    if (!store) throw new StoreAppearanceImageError("A loja não está disponível.", 404);
+    if (store.logoUrl === url || store.coverUrl === url) return false;
+    assertStoreAppearanceBlobConfigured();
+    await del(url);
+    return true;
+  });
 }
 
 export function assertStoreAppearanceBlobConfigured() {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) throw new StoreAppearanceImageError("O Vercel Blob ainda não está configurado neste ambiente.", 503);
+  if (!hasBlobWriteCredentials()) throw new StoreAppearanceImageError("O Vercel Blob ainda não está configurado neste ambiente.", 503);
 }
 

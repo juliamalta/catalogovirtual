@@ -1,13 +1,15 @@
 import "@/components/storefront/storefront.css";
+import Link from "next/link";
 import { Check } from "lucide-react";
 import { notFound } from "next/navigation";
 import { AppearanceEditor } from "@/components/dashboard/appearance-editor";
 import { DashboardPageHeader } from "@/components/dashboard/dashboard-page-header";
+import { storeBluePreset, storeSoftBlue } from "@/features/stores/store-appearance-colors";
 import { requireAuthorizedStore } from "@/server/authorization";
 import { getDb } from "@/lib/db";
 import { storeSettings } from "@/lib/db/schema";
 import { getPublicStoreBySlug } from "@/server/queries/store.queries";
-import { isBlobStorageConfigured } from "@/server/services/blob-storage.service";
+import { getBlobUploadMode } from "@/server/services/blob-configuration";
 import { eq } from "drizzle-orm";
 import type { StoreDemo } from "@/types/store.types";
 
@@ -36,12 +38,15 @@ export default async function AppearancePage({ params, searchParams }: { params:
     logoUrl: visibleStore.logoUrl ?? undefined,
     cover: visibleStore.coverUrl ?? "",
     categories: visibleStore.categories,
-    products: visibleStore.products
+    products: visibleStore.products,
+    delivery: visibleStore.delivery,
+    operatingStatus: visibleStore.operatingStatus
   };
 
   return (
     <main className="dashboard-main dashboard-appearance-main">
-      <DashboardPageHeader eyebrow="Identidade visual" title="Aparência" description="Edite sua marca e acompanhe a prévia da loja enquanto configura." storeName={store.name} />
+      <DashboardPageHeader title="Aparência" description="Personalize sua marca. Salve as alterações para atualizar a loja."
+        actions={<Link className="secondary-button" href={`/${storeSlug}/preview`} target="_blank" rel="noreferrer">Prévia da loja</Link>} />
       {query.status === "salvo" && <p className="notice-success" role="status"><Check size={17} />Configurações salvas.</p>}
       {query.erro && <p className="auth-error" role="alert">{query.erro}</p>}
       <AppearanceEditor
@@ -53,13 +58,14 @@ export default async function AppearancePage({ params, searchParams }: { params:
           storefrontType: store.storefrontType,
           headline: settings?.headline ?? store.name,
           subtitle: settings?.subtitle ?? "",
-          primaryColor: settings?.primaryColor ?? "#7351D6",
-          secondaryColor: settings?.secondaryColor ?? "#F5F2FF",
+          primaryColor: settings?.primaryColor ?? storeBluePreset.value,
+          secondaryColor: settings?.secondaryColor ?? storeSoftBlue,
           logoUrl: store.logoUrl ?? "",
           coverUrl: store.coverUrl ?? ""
         }}
         previewStore={previewStore}
-        blobConfigured={isBlobStorageConfigured()}
+        blobConfigured={getBlobUploadMode() !== null}
+        blobUploadMode={getBlobUploadMode()}
         whatsappNumber={store.whatsappNumber}
         deliveryEnabled={settings?.deliveryEnabled ?? false}
         pickupEnabled={settings?.pickupEnabled ?? true}

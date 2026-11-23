@@ -2,10 +2,11 @@
 
 import { useMemo, useState, type CSSProperties, type FormEvent, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { upload } from "@vercel/blob/client";
+import { upload, uploadPresigned } from "@vercel/blob/client";
 import { BookOpen, Check, Grid2X2, Image as ImageIcon, LayoutTemplate, Palette, Store, Type, Upload } from "lucide-react";
 import { cleanupUnattachedStoreAppearanceImageAction, saveStoreAppearanceAction } from "@/app/painel/actions";
-import type { ProductImageMimeType } from "@/features/images/image-storage.types";
+import type { ProductImageMimeType, ProductImageUploadMode } from "@/features/images/image-storage.types";
+import { storeBluePreset, storeDarkBluePreset } from "@/features/stores/store-appearance-colors";
 import { Storefront } from "@/components/storefront/storefront";
 import type { StoreDemo, StorefrontType } from "@/types/store.types";
 import { AppearanceImageField, type AppearanceAssetType } from "./appearance-image-field";
@@ -28,16 +29,17 @@ interface AppearanceEditorProps {
   initialDraft: AppearanceDraft;
   previewStore: StoreDemo;
   blobConfigured: boolean;
+  blobUploadMode?: ProductImageUploadMode | null;
   whatsappNumber: string;
   deliveryEnabled: boolean;
   pickupEnabled: boolean;
 }
 
 const tabs = [
-  { id: "identity", label: "Identidade", icon: Store },
+  { id: "identity", label: "Sua marca", icon: Store },
   { id: "colors", label: "Cores", icon: Palette },
-  { id: "banner", label: "Banner", icon: Type },
-  { id: "layout", label: "Layout", icon: LayoutTemplate }
+  { id: "banner", label: "Capa e textos", icon: Type },
+  { id: "layout", label: "Modelo", icon: LayoutTemplate }
 ] as const;
 
 const models: { value: StorefrontType; title: string; description: string; icon: typeof BookOpen }[] = [
@@ -46,10 +48,17 @@ const models: { value: StorefrontType; title: string; description: string; icon:
   { value: "SHOWCASE", title: "Vitrine Online", description: "Destaque coleções e imagens.", icon: Store }
 ];
 
-const colorPresets = ["#7351D6", "#2563EB", "#0F766E", "#B45309", "#BE4566", "#292634"];
+const colorPresets = [
+  storeBluePreset,
+  storeDarkBluePreset,
+  { name: "Verde", value: "#0F766E" },
+  { name: "Âmbar", value: "#B45309" },
+  { name: "Rosa", value: "#BE4566" },
+  { name: "Grafite", value: "#292634" }
+];
 const extensionByMime: Record<ProductImageMimeType, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
-export function AppearanceEditor({ storeSlug, storeId, initialDraft, previewStore, blobConfigured, whatsappNumber, deliveryEnabled, pickupEnabled }: AppearanceEditorProps) {
+export function AppearanceEditor({ storeSlug, storeId, initialDraft, previewStore, blobConfigured, blobUploadMode = "legacy", whatsappNumber, deliveryEnabled, pickupEnabled }: AppearanceEditorProps) {
   const router = useRouter();
   const [draft, setDraft] = useState(initialDraft);
   const [files, setFiles] = useState<Partial<Record<AppearanceAssetType, File>>>({});
@@ -113,9 +122,10 @@ export function AppearanceEditor({ storeSlug, storeId, initialDraft, previewStor
   async function uploadAppearanceImage(assetType: AppearanceAssetType, file: File) {
     const mimeType = file.type as ProductImageMimeType;
     const pathname = `stores/${storeId}/appearance/${assetType}/${crypto.randomUUID()}.${extensionByMime[mimeType]}`;
-    const blob = await upload(pathname, file, {
+    const uploadImage = blobUploadMode === "presigned" ? uploadPresigned : upload;
+    const blob = await uploadImage(pathname, file, {
       access: "public",
-      handleUploadUrl: "/api/stores/images/upload",
+      handleUploadUrl: blobUploadMode === "presigned" ? "/api/stores/images/upload?mode=presigned" : "/api/stores/images/upload",
       contentType: mimeType,
       clientPayload: JSON.stringify({ storeSlug, assetType, mimeType, size: file.size }),
       onUploadProgress: ({ percentage }) => setProgress((current) => ({ ...current, [assetType]: Math.round(percentage) }))
@@ -163,15 +173,6 @@ export function AppearanceEditor({ storeSlug, storeId, initialDraft, previewStor
     }
   }
 
-  const primaryColorNames: Record<string, string> = {
-    "#7351D6": "Roxo",
-    "#2563EB": "Azul",
-    "#0F766E": "Verde",
-    "#B45309": "Âmbar",
-    "#BE4566": "Rosa",
-    "#292634": "Grafite"
-  };
-
   return (
     <form id="appearance-editor-form" className="appearance-editor-form" onSubmit={saveAppearance}>
       <input type="hidden" name="whatsappNumber" value={whatsappNumber} />
@@ -211,7 +212,10 @@ export function AppearanceEditor({ storeSlug, storeId, initialDraft, previewStor
             <div className="appearance-color-card">
               <div className="appearance-color-card-copy"><strong>Cor principal</strong><span>Botões, links e destaques</span></div>
               <div className="appearance-primary-swatches" role="group" aria-label="Paleta de cores principais">
-                {colorPresets.map((color) => <button key={color} type="button" className={draft.primaryColor.toLowerCase() === color.toLowerCase() ? "is-selected" : ""} style={{ "--swatch-color": color } as CSSProperties} onClick={() => updateDraft("primaryColor", color)} aria-label={primaryColorNames[color]} aria-pressed={draft.primaryColor.toLowerCase() === color.toLowerCase()} />)}
+                {colorPresets.map(({ name, value }) => {
+                  const selected = draft.primaryColor.toUpperCase() === value;
+                  return <button key={value} type="button" className={selected ? "is-selected" : ""} style={{ "--swatch-color": value } as CSSProperties} onClick={() => updateDraft("primaryColor", value)} aria-label={name} aria-pressed={selected} />;
+                })}
                 <label className="appearance-custom-color" title="Escolher uma cor personalizada"><input name="primaryColor" type="color" value={draft.primaryColor} onChange={(event) => updateDraft("primaryColor", event.currentTarget.value)} aria-label="Cor principal personalizada" /><Palette size={16} /></label>
               </div>
             </div>
@@ -249,7 +253,7 @@ export function AppearanceEditor({ storeSlug, storeId, initialDraft, previewStor
 
         <aside className="appearance-preview-column" aria-label="Prévia da loja">
           <div className="appearance-preview-heading"><div><span>PRÉVIA AO VIVO</span><strong>{preview.name}</strong></div><span className="appearance-preview-dot"><i />Prévia privada</span></div>
-          <div className="appearance-preview-frame"><Storefront store={preview} isPreview /></div>
+          <div className="appearance-preview-frame" inert><Storefront store={preview} isPreview /></div>
           <p className="appearance-preview-note">Esta prévia usa o modelo público da sua loja e os produtos ativos cadastrados. As mudanças aparecem aqui sem afetar a loja publicada.</p>
         </aside>
       </div>

@@ -31,3 +31,15 @@ export async function requireAuthorizedStore(storeSlug: string, permission: Stor
   if (!result || !hasStorePermission({ storeId: result.storeId, role: result.role }, result.store.id, permission)) notFound();
   return { user, store: result.store, role: result.role };
 }
+
+type StoreTransaction = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
+
+/** Recheck the current membership in the writing transaction. FOR SHARE keeps
+ * revocation/deletion from overtaking a mutation that has already authorized. */
+export async function lockStorePermission(tx: StoreTransaction, storeId: string, userId: string, permission: StorePermission) {
+  const [membership] = await tx.select({ storeId: storeMembers.storeId, role: storeMembers.role })
+    .from(storeMembers)
+    .where(and(eq(storeMembers.storeId, storeId), eq(storeMembers.userId, userId)))
+    .limit(1).for("share");
+  if (!hasStorePermission(membership ?? null, storeId, permission)) notFound();
+}

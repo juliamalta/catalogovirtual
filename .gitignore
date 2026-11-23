@@ -1,4 +1,4 @@
-node_modules/
+﻿node_modules/
 .next/
 out/
 .audit-backup/
@@ -6,3 +6,4 @@ out/
 .env*
 !.env.example
 npm-debug.log*
+.vercel/

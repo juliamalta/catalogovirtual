@@ -25,6 +25,8 @@ export default async function StorePreviewPage({ params }: { params: Promise<{ s
     logoUrl: store.logoUrl ?? undefined,
     cover: store.coverUrl ?? "",
     categories: store.categories,
-    products: store.products
+    products: store.products,
+    delivery: store.delivery,
+    operatingStatus: store.operatingStatus
   }} />;
 }

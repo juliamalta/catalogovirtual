@@ -1,8 +1,9 @@
 import type { useCart } from "@/hooks/use-cart";
+import type { CartAddition } from "@/features/cart/product-selection";
 import type { CartLine, StoreCategory, StoreDemo, StoreProduct, StorefrontType } from "@/types/store.types";
 
 export type StoreCartController = ReturnType<typeof useCart>;
-export type AddStoreProduct = (product: StoreProduct, option?: string, note?: string) => void;
+export type AddStoreProduct = (product: StoreProduct, option?: string, note?: string, addition?: CartAddition) => void;
 
 export interface StorefrontHeaderProps {
   store: StoreDemo;
@@ -13,10 +14,18 @@ export interface StorefrontHeaderProps {
 export interface StorefrontStoreProps {
   store: StoreDemo;
   isPreview?: boolean;
+  isDemo?: boolean;
+}
+
+export interface StorefrontProps {
+  store: StoreDemo;
+  isPreview?: boolean;
+  isDemo?: boolean;
 }
 
 export interface StorefrontRibbonProps {
   storefrontType: StorefrontType;
+  isDemo?: boolean;
 }
 
 export interface CategoryFilterProps {
@@ -33,6 +42,7 @@ export interface ProductSearchProps {
 }
 
 export interface ProductCardProps {
+  cart: StoreCartController;
   catalogTypography: boolean;
   product: StoreProduct;
   accent: string;
@@ -41,9 +51,12 @@ export interface ProductCardProps {
 }
 
 export interface ProductGridProps {
+  cart: StoreCartController;
   catalogTypography: boolean;
   products: StoreProduct[];
   accent: string;
+  emptyMessage: string;
+  showClearFilters: boolean;
   onAdd: AddStoreProduct;
   onSelect: (product: StoreProduct) => void;
   onClearFilters: () => void;

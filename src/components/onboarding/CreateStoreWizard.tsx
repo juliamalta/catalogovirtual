@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState, type FormEvent } from "react";
 import { ArrowLeft, ArrowRight, Check, LoaderCircle } from "lucide-react";
 import { checkStoreSlugAction, createStoreAction } from "@/app/painel/actions";
+import { storeBluePreset } from "@/features/stores/store-appearance-colors";
 import { createStoreSchema, slugify, storeSlugSchema, storefrontTypeSchema } from "@/lib/validations/store";
 import type { StorefrontType } from "@/types/store.types";
 import { StoreContactStep } from "./StoreContactStep";
@@ -17,7 +18,7 @@ const initialForm = {
   description: "",
   storefrontType: "CATALOG" as StorefrontType,
   whatsappNumber: "",
-  primaryColor: "#7351D6"
+  primaryColor: storeBluePreset.value
 };
 
 function editableSlug(value: string) {
@@ -173,22 +174,22 @@ export function CreateStoreWizard() {
     <div className="mx-auto w-full max-w-[1060px]" style={{ fontFamily: "'DM Sans', sans-serif" }}>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-[#8066b2]">Configuração inicial</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-[#292431] sm:text-[36px]">Crie sua loja</h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-[#77717f]">Um passo de cada vez. Você poderá ajustar tudo depois.</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-brand">Configuração inicial</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-ink sm:text-[36px]">Crie sua loja</h1>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-ink-secondary">Um passo de cada vez. Você poderá ajustar tudo depois.</p>
         </div>
-        <span className="rounded-full border border-[#ebe7ef] bg-white px-3 py-1.5 text-xs font-medium text-[#77717f]">Etapa {step} de 3</span>
+        <span className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-medium text-ink-secondary">Etapa {step} de 3</span>
       </div>
 
-      <div className="grid overflow-hidden rounded-2xl border border-[#eae6ee] bg-white shadow-[0_18px_50px_rgba(38,28,57,0.06)] lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.8fr)]">
+      <div className="grid overflow-hidden rounded-2xl border border-line bg-surface shadow-wizard lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.8fr)]">
         <div className="p-5 sm:p-8 lg:p-10">
           <WizardProgress currentStep={step} />
 
           <form action={action} onSubmit={handleSubmit} noValidate>
             <input type="hidden" name="primaryColor" value={form.primaryColor} />
             <div aria-live="polite">
-              {state.error && <p role="alert" className="mb-5 rounded-xl border border-[#f1d5d8] bg-[#fff5f5] px-4 py-3 text-sm text-[#a23f4c]">{state.error}</p>}
-              {errors.storefrontType && <p role="alert" className="mb-5 rounded-xl border border-[#f1d5d8] bg-[#fff5f5] px-4 py-3 text-sm text-[#a23f4c]">{errors.storefrontType}</p>}
+              {state.error && <p role="alert" className="mb-5 rounded-xl border border-error-border bg-error-soft px-4 py-3 text-sm text-error">{state.error}</p>}
+              {errors.storefrontType && <p role="alert" className="mb-5 rounded-xl border border-error-border bg-error-soft px-4 py-3 text-sm text-error">{errors.storefrontType}</p>}
             </div>
 
             <div hidden={step !== 1}>
@@ -219,19 +220,19 @@ export function CreateStoreWizard() {
               />
             </div>
 
-            <div className="mt-8 flex items-center justify-between gap-3 border-t border-[#f0edf2] pt-5">
+            <div className="mt-8 flex items-center justify-between gap-3 border-t border-line pt-5">
               {step > 1 ? (
-                <button type="button" onClick={() => { setErrors({}); setStep((current) => current - 1); }} className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-[#625c69] transition hover:bg-[#f7f5f9] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#7351d6]/15">
+                <button type="button" onClick={() => { setErrors({}); setStep((current) => current - 1); }} className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold text-ink-secondary transition hover:bg-canvas focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/15">
                   <ArrowLeft size={16} /> Voltar
                 </button>
               ) : <span />}
 
               {step < 3 ? (
-                <button type="button" onClick={() => void (step === 1 ? continueFromIdentity() : continueFromModel())} disabled={step === 1 && slugStatus === "checking"} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#7351d6] px-5 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(115,81,214,0.2)] transition hover:bg-[#6342c2] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#7351d6]/25 disabled:cursor-wait disabled:opacity-65">
+                <button type="button" onClick={() => void (step === 1 ? continueFromIdentity() : continueFromModel())} disabled={step === 1 && slugStatus === "checking"} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand px-5 text-sm font-semibold text-white shadow-brand transition hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/25 disabled:cursor-wait disabled:opacity-65">
                   Continuar <ArrowRight size={16} />
                 </button>
               ) : (
-                <button type="submit" disabled={pending || slugStatus !== "available"} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#7351d6] px-5 text-sm font-semibold text-white shadow-[0_6px_16px_rgba(115,81,214,0.2)] transition hover:bg-[#6342c2] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#7351d6]/25 disabled:cursor-wait disabled:opacity-65">
+                <button type="submit" disabled={pending || slugStatus !== "available"} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand px-5 text-sm font-semibold text-white shadow-brand transition hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand/25 disabled:cursor-wait disabled:opacity-65">
                   {pending ? <><LoaderCircle size={16} className="animate-spin" /> Criando loja…</> : <>Criar minha loja <Check size={16} /></>}
                 </button>
               )}
@@ -239,13 +240,13 @@ export function CreateStoreWizard() {
           </form>
         </div>
 
-        <div className="border-t border-[#eeeaf1] bg-[#fbfafc] p-5 sm:p-8 lg:border-l lg:border-t-0 lg:p-8">
+        <div className="border-t border-line bg-canvas p-5 sm:p-8 lg:border-l lg:border-t-0 lg:p-8">
           <div className="mb-4 hidden lg:block">
-            <p className="text-sm font-semibold text-[#403a47]">Sua identidade em tempo real</p>
-            <p className="mt-1 text-xs leading-5 text-[#898390]">A prévia acompanha suas escolhas.</p>
+            <p className="text-sm font-semibold text-ink">Sua identidade em tempo real</p>
+            <p className="mt-1 text-xs leading-5 text-ink-secondary">A prévia acompanha suas escolhas.</p>
           </div>
           <StorePreview {...form} />
-          <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-[#898390]"><span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[#eee9f7] text-[#7351d6]">i</span>Você poderá adicionar produtos e personalizar sua loja no painel.</p>
+          <p className="mt-4 flex items-start gap-2 text-xs leading-5 text-ink-secondary"><span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-brand-soft text-brand">i</span>Você poderá adicionar produtos e personalizar sua loja no painel.</p>
         </div>
       </div>
     </div>
